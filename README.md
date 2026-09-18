@@ -31,4 +31,5 @@ A single-player life simulation game where every decision has consequences.
 
 ## 👨‍💻 Creator
 
-Shah Rashid
+shahhh rashidd faisal arab
+mohammed shamil 
