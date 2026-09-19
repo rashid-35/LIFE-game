@@ -3,8 +3,8 @@ const state = {
     hour: 7, minute: 30, cash: 100, debt: 0, maxDebt: 500,
     groceries: { meals: 7, drinks: 10 }, location: "home",
     stats: { health: 100, energy: 100, hunger: 100, hydration: 100, hygiene: 100, mood: 80 },
-    skills: { education: 0, social: 0, fitness: 0, work: 0 }, npcs: [], history: [], feed: [],
-    currentSection: "places", ended: false,
+    skills: { education: 0, social: 0, fitness: 0, work: 0 },
+    npcs: [], history: [], feed: [], currentSection: "places", ended: false,
 };
 
 const COUNTRIES = {
@@ -31,55 +31,106 @@ const JOBS = [
     { title: "Sales Representative", education: 20, reputation: 45, pay: 85 }, { title: "Junior Developer", education: 70, reputation: 20, pay: 110 },
     { title: "Team Coordinator", education: 50, reputation: 70, pay: 125 },
 ];
+
+// Activity effects are deliberately moderate. Daily needs are handled only by dailyMaintenance().
 const ACTIVITIES = {
     home: [
-        { id: "sleep", emoji: "😴", name: "Sleep", cost: 0, time: 480, effects: { energy: 60, health: 5, mood: 5 } },
+        { id: "sleep", emoji: "😴", name: "Sleep", cost: 0, time: 480, effects: { energy: 60, health: 5, mood: 5, hunger: -5, hydration: -5 } },
         { id: "eat", emoji: "🍽️", name: "Eat Meal", cost: 0, time: 30, effects: { hunger: 40, mood: 5 }, grocery: "meals" },
         { id: "drink", emoji: "💧", name: "Drink Water", cost: 0, time: 5, effects: { hydration: 30 }, grocery: "drinks" },
         { id: "shower", emoji: "🚿", name: "Shower", cost: 2, time: 15, effects: { hygiene: 60, mood: 5 } },
-        { id: "tv", emoji: "📺", name: "Watch TV", cost: 0, time: 60, effects: { mood: 15, energy: -5 } },
+        { id: "tv", emoji: "📺", name: "Watch TV", cost: 0, time: 60, effects: { mood: 12, energy: -2 } },
         { id: "phone", emoji: "📱", name: "Use Phone", cost: 0, time: 30, effects: { mood: 8, social: 2 } },
     ],
     school: [
-        { id: "class", emoji: "📚", name: "Attend Class", cost: 0, time: 120, effects: { education: 8, energy: -15, mood: -5 } },
-        { id: "study", emoji: "📖", name: "Study", cost: 0, time: 90, effects: { education: 10, energy: -10 } },
-        { id: "library", emoji: "📕", name: "Library", cost: 0, time: 60, effects: { education: 6, mood: -3 } },
+        { id: "class", emoji: "📚", name: "Attend Class", cost: 0, time: 120, effects: { education: 8, energy: -12, mood: -3 } },
+        { id: "study", emoji: "📖", name: "Study", cost: 0, time: 90, effects: { education: 10, energy: -10, mood: -3 } },
+        { id: "library", emoji: "📕", name: "Library", cost: 0, time: 60, effects: { education: 6, energy: -6, mood: -2 } },
         { id: "socialize", emoji: "🗣️", name: "Socialize", cost: 0, time: 45, effects: { social: 8, mood: 10 } },
     ],
     work: [
-        { id: "shift", emoji: "💼", name: "Work Shift", cost: 0, time: 240, effects: { income: 60, energy: -25, mood: -8, work: 5 } },
-        { id: "overtime", emoji: "⏰", name: "Overtime", cost: 0, time: 180, effects: { income: 50, energy: -30, mood: -12, work: 4 } },
+        { id: "shift", emoji: "💼", name: "Work Shift", cost: 0, time: 240, effects: { income: 60, energy: -22, mood: -6, work: 5 } },
+        { id: "overtime", emoji: "⏰", name: "Overtime", cost: 0, time: 180, effects: { income: 50, energy: -28, mood: -8, work: 4 } },
     ],
-    gym: [{ id: "workout", emoji: "🏋️", name: "Workout", cost: 8, time: 60, effects: { fitness: 10, health: 8, energy: -20, mood: 8 } }, { id: "cardio", emoji: "🏃", name: "Cardio", cost: 5, time: 45, effects: { fitness: 8, health: 6, energy: -15, mood: 6 } }],
-    park: [{ id: "walk", emoji: "🚶", name: "Take a Walk", cost: 0, time: 30, effects: { mood: 10, health: 3, energy: -5 } }, { id: "jog", emoji: "🏃", name: "Jog", cost: 0, time: 40, effects: { fitness: 6, health: 5, energy: -15, mood: 8 } }, { id: "meet", emoji: "👥", name: "Meet Friends", cost: 0, time: 60, effects: { social: 8, mood: 12 } }],
-    mall: [{ id: "shop", emoji: "🛍️", name: "Go Shopping", cost: 30, time: 90, effects: { mood: 20, hygiene: 5 } }, { id: "foodcourt", emoji: "🍔", name: "Food Court", cost: 15, time: 45, effects: { hunger: 35, mood: 10 } }, { id: "groceries", emoji: "🛒", name: "Buy Groceries", cost: 45, time: 30, effects: {}, groceryPurchase: true }, { id: "movie", emoji: "🎬", name: "Watch Movie", cost: 12, time: 120, effects: { mood: 25, energy: -5 } }],
-    cafe: [{ id: "coffee", emoji: "☕", name: "Buy Coffee", cost: 5, time: 20, effects: { energy: 15, hydration: 10, mood: 5 } }, { id: "cafe_study", emoji: "📖", name: "Study at Café", cost: 5, time: 60, effects: { education: 7, mood: 5 } }, { id: "cafe_meet", emoji: "💬", name: "Meet Someone", cost: 5, time: 45, effects: { social: 8, mood: 10 } }],
-    hospital: [{ id: "checkup", emoji: "🩺", name: "Checkup", cost: 25, time: 60, effects: { health: 30 } }, { id: "treat", emoji: "💊", name: "Get Treatment", cost: 40, time: 90, effects: { health: 50, energy: -10 } }],
+    gym: [
+        { id: "workout", emoji: "🏋️", name: "Workout", cost: 8, time: 60, effects: { fitness: 10, health: 6, energy: -18, hygiene: -5, hydration: -5, mood: 7 } },
+        { id: "cardio", emoji: "🏃", name: "Cardio", cost: 5, time: 45, effects: { fitness: 8, health: 5, energy: -15, hygiene: -4, hydration: -4, mood: 6 } },
+    ],
+    park: [
+        { id: "walk", emoji: "🚶", name: "Take a Walk", cost: 0, time: 30, effects: { mood: 8, health: 2, energy: -4 } },
+        { id: "jog", emoji: "🏃", name: "Jog", cost: 0, time: 40, effects: { fitness: 6, health: 4, energy: -10, hygiene: -3, hydration: -3, mood: 7 } },
+        { id: "meet", emoji: "👥", name: "Meet Friends", cost: 0, time: 60, effects: { social: 8, mood: 12 } },
+    ],
+    mall: [
+        { id: "shop", emoji: "🛍️", name: "Go Shopping", cost: 30, time: 90, effects: { mood: 18, hygiene: 3 } },
+        { id: "foodcourt", emoji: "🍔", name: "Food Court", cost: 15, time: 45, effects: { hunger: 35, mood: 8 } },
+        { id: "groceries", emoji: "🛒", name: "Buy Groceries", cost: 45, time: 30, effects: {}, groceryPurchase: true },
+        { id: "movie", emoji: "🎬", name: "Watch Movie", cost: 12, time: 120, effects: { mood: 22, energy: -3 } },
+    ],
+    cafe: [
+        { id: "coffee", emoji: "☕", name: "Buy Coffee", cost: 5, time: 20, effects: { energy: 15, hydration: 10, mood: 5 } },
+        { id: "cafe_study", emoji: "📖", name: "Study at Café", cost: 5, time: 60, effects: { education: 7, energy: -7, mood: 3 } },
+        { id: "cafe_meet", emoji: "💬", name: "Meet Someone", cost: 5, time: 45, effects: { social: 8, mood: 10 } },
+    ],
+    hospital: [
+        { id: "checkup", emoji: "🩺", name: "Checkup", cost: 25, time: 60, effects: { health: 30 } },
+        { id: "treat", emoji: "💊", name: "Get Treatment", cost: 40, time: 90, effects: { health: 50, energy: -10 } },
+    ],
 };
 const TRAVEL = [["United Arab Emirates", "🇦🇪", 200], ["Afghanistan", "🇦🇫", 150], ["Pakistan", "🇵🇰", 120], ["India", "🇮🇳", 130], ["Spain", "🇪🇸", 180]];
 const NAMES = ["Albert Lalu", "Harshith Pradeep", "Fares Yusuf", "Anand John", "Ryan Matthew", "Mohammed Shamil", "Yahya bin Navas", "Omar Aslam"];
 const EMOJIS = ["🙂", "😎", "🤓", "😊", "😄", "🥳", "😌", "🤗"];
-const EVENTS = [[0.28, "A quiet day gave you some time to clear your head.", "info", { mood: 4 }], [0.20, "You found AED 15 on your way home.", "good", {}, 15], [0.18, "You caught a small cold. Take it easy today.", "bad", { health: -5, energy: -8 }], [0.20, "A friend sent you a funny message. It lifted your mood.", "good", { mood: 7, social: 2 }], [0.14, "You had an unexpectedly productive morning.", "good", { energy: 5, mood: 4 }]];
+const EVENTS = [
+    [0.28, "A quiet day gave you some time to clear your head.", "info", { mood: 4 }],
+    [0.20, "You found AED 15 on your way home.", "good", {}, 15],
+    [0.18, "You caught a small cold. Take it easy today.", "bad", { health: -5, energy: -8 }],
+    [0.20, "A friend sent you a funny message. It lifted your mood.", "good", { mood: 7, social: 2 }],
+    [0.14, "You had an unexpectedly productive morning.", "good", { energy: 5, mood: 4 }],
+];
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const money = value => "AED " + Math.round(value).toLocaleString();
+const STAT_KEYS = ["health", "energy", "hunger", "hydration", "hygiene", "mood"];
 
 function timeText() { const suffix = state.hour >= 12 ? "PM" : "AM"; return (state.hour % 12 || 12) + ":" + String(state.minute).padStart(2, "0") + " " + suffix; }
 function addFeed(text, type = "info") { const item = { day: state.day, time: timeText(), text, type }; state.feed.unshift(item); state.history.push(item); state.feed = state.feed.slice(0, 50); }
-function applyEffects(effects = {}) { Object.entries(effects).forEach(([key, amount]) => { if (key in state.stats) state.stats[key] = clamp(state.stats[key] + amount, 0, 100); if (key in state.skills) state.skills[key] = Math.max(0, state.skills[key] + amount); }); }
+
+// All stat changes go through this function so every value remains in the 0-100 range.
+function applyEffects(effects = {}) {
+    Object.entries(effects).forEach(([key, amount]) => {
+        if (STAT_KEYS.includes(key)) state.stats[key] = clamp(state.stats[key] + amount, 0, 100);
+        else if (key in state.skills) state.skills[key] = Math.max(0, state.skills[key] + amount);
+    });
+}
+
+// The only central passive-decrease system. It runs once per completed day.
+function dailyMaintenance() {
+    applyEffects({ energy: -22, hunger: -22, hydration: -27, hygiene: -12, mood: -7 });
+    const penalties = {};
+    if (state.stats.hunger < 20) { penalties.health = -4; penalties.energy = -3; penalties.mood = -2; }
+    if (state.stats.hydration < 20) { penalties.health = (penalties.health || 0) - 4; penalties.energy = (penalties.energy || 0) - 3; penalties.mood = (penalties.mood || 0) - 2; }
+    if (state.stats.hygiene < 20) { penalties.health = (penalties.health || 0) - 2; penalties.mood = (penalties.mood || 0) - 2; }
+    applyEffects(penalties);
+}
 
 function advanceDay() {
     state.day++;
-    applyEffects({ energy: -25, hunger: -25, hydration: -25, hygiene: -15, mood: -10 });
-    if (state.stats.hunger < 20) state.stats.health = clamp(state.stats.health - 5, 0, 100);
-    if (state.stats.hydration < 20) state.stats.health = clamp(state.stats.health - 5, 0, 100);
-    if (state.stats.hygiene < 20) state.stats.health = clamp(state.stats.health - 3, 0, 100);
+    dailyMaintenance();
     if (state.debt > 0) { const interest = Math.round(state.debt * 0.05); state.debt = clamp(state.debt + interest, 0, state.maxDebt); addFeed("Debt interest added: +" + money(interest) + ".", "bad"); }
-    if (state.day <= state.totalDays) { addFeed("Day " + state.day + ". Time to get moving."); const event = EVENTS.find(item => Math.random() < item[0]); if (event) { applyEffects(event[3]); if (event[4]) state.cash += event[4]; addFeed(event[1], event[2]); } }
+    if (state.day <= state.totalDays) {
+        addFeed("Day " + state.day + ". Time to get moving.");
+        const event = EVENTS.find(item => Math.random() < item[0]);
+        if (event) { applyEffects(event[3]); if (event[4]) state.cash += event[4]; addFeed(event[1], event[2]); }
+    }
     if (state.location === "school" && state.day > 15) { state.location = "home"; updateLocation(); }
     checkGameOver();
-    if (state.day > state.totalDays) endGame();
+    if (state.day > state.totalDays && !state.ended) endGame();
 }
-function addMinutes(minutes) { state.minute += minutes; while (state.minute >= 60) { state.minute -= 60; state.hour++; } while (state.hour >= 24) { state.hour -= 24; advanceDay(); } }
+
+function addMinutes(minutes) {
+    state.minute += minutes;
+    while (state.minute >= 60) { state.minute -= 60; state.hour++; }
+    while (state.hour >= 24 && !state.ended) { state.hour -= 24; advanceDay(); }
+}
 
 function startGame() {
     state.name = document.getElementById("name").value.trim() || "Player"; state.country = document.getElementById("country").value;
@@ -95,7 +146,8 @@ function goTo(placeId) { if (state.ended) return; const place = PLACES.find(item
 function showSection(section) { state.currentSection = section; ["place", "activity", "travel"].forEach(name => { const tab = document.getElementById(name + "Tab"); if (tab) tab.classList.toggle("active", section === name + "s"); }); renderMainGrid(); }
 
 function doActivity(id) {
-    if (state.ended) return; const activity = (ACTIVITIES[state.location] || []).find(item => item.id === id); if (!activity) return;
+    if (state.ended) return;
+    const activity = (ACTIVITIES[state.location] || []).find(item => item.id === id); if (!activity) return;
     if (!available(state.location)) { addFeed("This place is closed right now.", "bad"); return render(); }
     if (activity.cost > state.cash) { addFeed("You can't afford that.", "bad"); return render(); }
     if (activity.grocery && state.groceries[activity.grocery] <= 0) { addFeed("You're out of that. Buy more groceries at the mall.", "bad"); return render(); }
@@ -103,17 +155,21 @@ function doActivity(id) {
     if (activity.groceryPurchase) { state.groceries.meals += 7; state.groceries.drinks += 10; addFeed("You bought groceries: 7 meals and 10 drinks.", "good"); }
     state.cash -= activity.cost; applyEffects(activity.effects);
     if (activity.effects.income) { const job = getJob(); const income = activity.id === "shift" ? job.pay : activity.effects.income; state.cash += income; addFeed("You earned " + money(income) + " as a " + job.title + ".", "good"); }
-    if (state.personality === "academic" && activity.effects.education) state.skills.education += 3; if (state.personality === "social" && activity.effects.social) state.skills.social += 3;
-    addMinutes(activity.time); if (!state.ended) { addFeed(activity.name + " done."); if (["socialize", "meet", "cafe_meet"].includes(id)) { const npc = state.npcs[Math.floor(Math.random() * state.npcs.length)]; if (npc) npc.relationship = clamp(npc.relationship + 5, 0, 100); } }
+    if (state.personality === "academic" && activity.effects.education) state.skills.education += 3;
+    if (state.personality === "social" && activity.effects.social) state.skills.social += 3;
+    addMinutes(activity.time);
+    if (!state.ended) {
+        addFeed(activity.name + " done.");
+        if (["socialize", "meet", "cafe_meet"].includes(id)) { const npc = state.npcs[Math.floor(Math.random() * state.npcs.length)]; if (npc) npc.relationship = clamp(npc.relationship + 5, 0, 100); }
+    }
     checkGameOver(); render();
 }
 function getReputation() { return state.npcs.length ? Math.round(state.npcs.reduce((sum, npc) => sum + npc.relationship, 0) / state.npcs.length) : 0; }
 function getJob() { const qualified = JOBS.filter(job => state.skills.education >= job.education && getReputation() >= job.reputation); return qualified[qualified.length - 1] || JOBS[0]; }
-function skipDay() { if (state.ended) return; addFeed("You skipped the rest of the day."); applyEffects({ energy: -30, hunger: -30, hydration: -30, hygiene: -20, mood: -15 }); state.hour = 7; state.minute = 30; advanceDay(); render(); }
+function skipDay() { if (state.ended) return; addFeed("You skipped the rest of the day."); state.hour = 7; state.minute = 30; advanceDay(); render(); }
 function travelTo(country) { if (state.ended) return; const trip = TRAVEL.find(item => item[0] === country); if (!trip) return; if (state.country === country) { addFeed("You're already in " + country + "."); return render(); } if (state.cash < trip[2]) { addFeed("You can't afford that trip.", "bad"); return render(); } state.cash -= trip[2]; state.country = country; addMinutes(240); if (!state.ended) addFeed("You traveled to " + country + ".", "good"); render(); }
 function checkGameOver() { if (!state.ended && state.stats.health <= 0) endGame("Your health reached zero. You didn't survive."); else if (!state.ended && state.debt >= state.maxDebt) endGame("Your debt reached the maximum. You went bankrupt."); }
 function endGame(reason) { if (state.ended) return; state.ended = true; const verdict = state.skills.education >= state.skills.social && state.skills.education >= state.skills.fitness ? "You found your path through learning." : state.skills.social >= state.skills.fitness ? "You built a strong life through your relationships." : "You became healthier and stronger through discipline."; showModal("🏁 Your Story", "<p>" + (reason || "Thirty days are up. Here's how things turned out.") + "</p><p style='margin-top:14px'><strong>" + verdict + "</strong></p>"); }
-
 function showModal(title, content) { document.getElementById("modalBox").innerHTML = "<button class='close' onclick='closeModal()'>×</button><h2>" + title + "</h2>" + content; document.getElementById("modal").classList.remove("hidden"); }
 function closeModal() { document.getElementById("modal").classList.add("hidden"); }
 function restartGame() { closeModal(); state.ended = false; document.getElementById("game").classList.add("hidden"); document.getElementById("intro").classList.remove("hidden"); }
@@ -129,7 +185,12 @@ function historyModal() { const html = state.history.length ? state.history.slic
 function friendsModal() { const html = state.npcs.map(npc => "<div class='npc-row'><span class='avatar'>" + npc.emoji + "</span><div><div class='npc-name'>" + npc.name + "</div><div class='npc-rel'>Relationship: " + npc.relationship + "/100</div></div></div>").join(""); showModal("👥 Friends", html || "<p>You haven't met anyone yet.</p>"); }
 
 function render() { const country = COUNTRIES[state.country] || { flag: "🌍" }; document.getElementById("playerName").textContent = state.name; document.getElementById("playerCountry").textContent = country.flag + " " + state.country; document.getElementById("cash").textContent = money(state.cash); document.getElementById("debt").textContent = "Debt: " + money(state.debt) + " / " + money(state.maxDebt); document.getElementById("day").textContent = clamp(state.day, 1, state.totalDays) + " / " + state.totalDays; document.getElementById("time").textContent = timeText(); document.getElementById("timeFill").style.width = ((state.hour * 60 + state.minute) / 1440 * 100) + "%"; document.getElementById("act").textContent = state.day <= 15 ? "ACT I • SCHOOL" : "ACT II • ADULT LIFE"; renderStats(); renderNPCs(); renderInfo(); renderFeed(); renderMainGrid(); }
-function renderStats() { const rows = [["health", "Health"], ["energy", "Energy"], ["hunger", "Hunger"], ["hydration", "Hydration"], ["hygiene", "Hygiene"], ["mood", "Mood"]]; let html = rows.map(([key, label]) => "<div class='stat-row'><span class='label'>" + label + "</span><div class='stat-bar'><div class='fill " + key + "' style='width:" + state.stats[key] + "%'></div></div><span class='stat-value'>" + state.stats[key] + "</span></div>").join(""); html += "<div style='margin-top:14px;border-top:1px solid var(--line);padding-top:12px;'>" + ["education", "social", "fitness", "work"].map(key => "<div class='stat-row'><span class='label'>" + key[0].toUpperCase() + key.slice(1) + "</span><span class='stat-value'>" + state.skills[key] + "</span></div>").join("") + "</div>"; document.getElementById("stats").innerHTML = html; }
+function renderStats() {
+    const rows = [["health", "Health"], ["energy", "Energy"], ["hunger", "Hunger"], ["hydration", "Hydration"], ["hygiene", "Hygiene"], ["mood", "Mood"]];
+    let html = rows.map(([key, label]) => { const value = clamp(Math.round(state.stats[key]), 0, 100); state.stats[key] = value; return "<div class='stat-row'><span class='label'>" + label + "</span><div class='stat-bar'><div class='fill " + key + "' style='width:" + value + "%'></div></div><span class='stat-value'>" + value + "%</span></div>"; }).join("");
+    html += "<div style='margin-top:14px;border-top:1px solid var(--line);padding-top:12px;'>" + ["education", "social", "fitness", "work"].map(key => "<div class='stat-row'><span class='label'>" + key[0].toUpperCase() + key.slice(1) + "</span><span class='stat-value'>" + state.skills[key] + "</span></div>").join("") + "</div>";
+    document.getElementById("stats").innerHTML = html;
+}
 function renderNPCs() { document.getElementById("npcs").innerHTML = state.npcs.slice(0, 4).map(npc => "<div class='npc-row'><span class='avatar'>" + npc.emoji + "</span><div><div class='npc-name'>" + npc.name + "</div><div class='npc-rel'>Relationship: " + npc.relationship + "/100</div></div></div>").join(""); }
 function renderInfo() { const personality = PERSONALITIES[state.personality] || PERSONALITIES.balanced; document.getElementById("info").innerHTML = "<div class='info-row'><span>Age</span><span class='val'>" + state.age + "</span></div><div class='info-row'><span>Personality</span><span class='val'>" + personality.label + "</span></div><div class='info-row'><span>Groceries</span><span class='val'>" + state.groceries.meals + " meals · " + state.groceries.drinks + " drinks</span></div>"; }
 function renderFeed() { const html = state.feed.slice(0, 20).map(item => "<div class='feed-item " + item.type + "'><span class='time-tag'>Day " + item.day + " " + item.time + "</span>" + item.text + "</div>").join(""); document.getElementById("feed").innerHTML = html || "<p style='color:var(--muted);font-size:13px;'>Nothing much has happened yet.</p>"; }
